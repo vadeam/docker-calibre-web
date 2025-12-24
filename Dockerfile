@@ -3,7 +3,7 @@
 # слой с unrar, как в оригинале
 FROM ghcr.io/linuxserver/unrar:latest AS unrar
 
-# основной базовый образ linuxserver с s6
+# основной базовый образ linuxserver (s6 есть, но мы его использовать не будем)
 FROM ghcr.io/linuxserver/baseimage-ubuntu:noble
 
 # set version label
@@ -80,22 +80,34 @@ RUN \
     /var/tmp/* \
     /root/.cache
 
-# add local files (s6 сервисы и init-скрипты linuxserver)
-COPY root/ /
+# add local files (если хотите оставить какие-то конфиги из root/, но БЕЗ s6-сервисов)
+# если в root/ есть etc/services.d и etc/cont-init.d, их лучше удалить из контекста сборки,
+# чтобы s6 не пытался их запускать
+# COPY root/ /
 
 # add unrar
 COPY --from=unrar /usr/bin/unrar-ubuntu /usr/bin/unrar
 
 # ports and volumes
 EXPOSE 8083
-VOLUME /config
+VOLUME /config /books
 
 # подготовка к запуску под UID 1000 в Kubernetes:
-# 1) /run принадлежит UID 1000, чтобы s6-preinit не падал
-# 2) создаём пользователя calibreweb с UID 1000, чтобы не было "I have no name!"
+# создаём пользователя calibreweb и отдаём ему нужные директории
 RUN \
-  mkdir -p /run && \
-  chown 1000:1000 /run && \
+  mkdir -p /run /config /books && \
   if ! id -u 1000 >/dev/null 2>&1; then \
     useradd -u 1000 -d /config -M calibreweb || true; \
-  fi
+  fi && \
+  chown -R 1000:1000 /run /app /config /books
+
+# переключаемся на пользователя calibreweb
+USER 1000:1000
+
+WORKDIR /app/calibre-web
+
+# добавляем venv в PATH
+ENV PATH="/lsiopy/bin:${PATH}"
+
+# запускаем Calibre-Web напрямую, без s6
+CMD ["python3", "cps.py"]
