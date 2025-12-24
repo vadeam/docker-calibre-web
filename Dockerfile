@@ -87,3 +87,5 @@ COPY --from=unrar /usr/bin/unrar-ubuntu /usr/bin/unrar
 # ports and volumes
 EXPOSE 8083
 VOLUME /config
+
+RUN mkdir -p /run && chown 1000:1000 /run
