@@ -1,7 +1,9 @@
 # syntax=docker/dockerfile:1
 
+# слой с unrar, как в оригинале
 FROM ghcr.io/linuxserver/unrar:latest AS unrar
 
+# основной базовый образ linuxserver с s6
 FROM ghcr.io/linuxserver/baseimage-ubuntu:noble
 
 # set version label
@@ -57,7 +59,7 @@ RUN \
   pip install -U --no-cache-dir --find-links https://wheel-index.linuxserver.io/ubuntu/ -r \
     requirements.txt -r \
     optional-requirements.txt && \
-  echo "***install kepubify" && \
+  echo "**** install kepubify ****" && \
   if [ -z ${KEPUBIFY_RELEASE+x} ]; then \
     KEPUBIFY_RELEASE=$(curl -sX GET "https://api.github.com/repos/pgaskin/kepubify/releases/latest" \
     | awk '/tag_name/{print $4;exit}' FS='[""]'); \
@@ -78,14 +80,22 @@ RUN \
     /var/tmp/* \
     /root/.cache
 
-# add local files
+# add local files (s6 сервисы и init-скрипты linuxserver)
 COPY root/ /
 
 # add unrar
 COPY --from=unrar /usr/bin/unrar-ubuntu /usr/bin/unrar
 
-# ports and volumes
+# ports and volumes
 EXPOSE 8083
 VOLUME /config
 
-RUN mkdir -p /run && chown 1000:1000 /run
+# подготовка к запуску под UID 1000 в Kubernetes:
+# 1) /run принадлежит UID 1000, чтобы s6-preinit не падал
+# 2) создаём пользователя calibreweb с UID 1000, чтобы не было "I have no name!"
+RUN \
+  mkdir -p /run && \
+  chown 1000:1000 /run && \
+  if ! id -u 1000 >/dev/null 2>&1; then \
+    useradd -u 1000 -d /config -M calibreweb || true; \
+  fi
