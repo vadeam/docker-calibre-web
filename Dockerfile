@@ -110,4 +110,4 @@ WORKDIR /app/calibre-web
 ENV PATH="/lsiopy/bin:${PATH}"
 
 # запускаем Calibre-Web напрямую, без s6
-CMD ["python3", "cps.py"]
+CMD ["python3", "cps.py", "-p", "/config/app.db"]
